@@ -2,9 +2,10 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_REGISTRY = "your-docker-repo"
-        PYTEST_IMAGE = "${DOCKER_REGISTRY}/petstore-pytest:${env.BUILD_NUMBER}"
-        LOCUST_IMAGE = "${DOCKER_REGISTRY}/petstore-locust:${env.BUILD_NUMBER}"
+        // Replace with your Docker Hub username
+        DOCKER_HUB_USER = "your-dockerhub-username"
+        PYTEST_IMAGE = "${DOCKER_HUB_USER}/petstore-pytest:${env.BUILD_NUMBER}"
+        LOCUST_IMAGE = "${DOCKER_HUB_USER}/petstore-locust:${env.BUILD_NUMBER}"
     }
 
     stages {
@@ -14,11 +15,19 @@ pipeline {
             }
         }
 
-        stage('Build Images') {
+        stage('Build and Push Images') {
             steps {
                 script {
-                    sh "docker build -t ${PYTEST_IMAGE} -f infrastructure/docker/Dockerfile.pytest ."
-                    sh "docker build -t ${LOCUST_IMAGE} -f infrastructure/docker/Dockerfile.locust ."
+                    // Use the credentials ID defined in Jenkins
+                    docker.withRegistry('https://index.docker.io/v1/', 'docker-registry-credentials') {
+                        // Build images
+                        def pytestImg = docker.build("${PYTEST_IMAGE}", "-f infrastructure/docker/Dockerfile.pytest .")
+                        def locustImg = docker.build("${LOCUST_IMAGE}", "-f infrastructure/docker/Dockerfile.locust .")
+                        
+                        // Push images to Docker Hub
+                        pytestImg.push()
+                        locustImg.push()
+                    }
                 }
             }
         }
@@ -27,6 +36,7 @@ pipeline {
             steps {
                 script {
                     // Run pytest in a container and capture results
+                    // We pull the image we just pushed to ensure consistency
                     sh "docker run --rm -v ${WORKSPACE}/reports:/app/reports ${PYTEST_IMAGE}"
                 }
             }
@@ -40,7 +50,7 @@ pipeline {
         stage('Deploy Performance Infrastructure (K8s)') {
             steps {
                 script {
-                    // Update image names in k8s manifests and apply
+                    // Update image names in k8s manifests with the specific build tag and apply
                     sh "sed -i 's|your-docker-repo/petstore-locust:latest|${LOCUST_IMAGE}|g' infrastructure/k8s/locust.yaml"
                     sh "kubectl apply -f infrastructure/k8s/locust.yaml"
                 }
