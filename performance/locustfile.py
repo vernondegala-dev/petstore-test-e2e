@@ -6,9 +6,9 @@ import uuid
 # Prometheus Exporter Listener
 @events.init.add_listener
 def on_locust_init(environment, **kwargs):
-    if environment.web_ui:
-        # Exposes metrics at /export/prometheus on port 8089
-        PrometheusExporter(environment, port=8089)
+    # We use a dedicated port 9191 for Prometheus to avoid conflict with Web UI on 8089
+    # This works on both master and standalone instances
+    PrometheusExporter(environment, port=9191)
 
 class PetstoreUser(HttpUser):
     wait_time = between(1, 5)

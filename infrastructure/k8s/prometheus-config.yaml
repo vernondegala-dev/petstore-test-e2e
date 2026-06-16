@@ -1,8 +1,15 @@
-global:
-  scrape_interval: 15s
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: default
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 5s # Faster scraping for real-time Locust metrics
 
-scrape_configs:
-  - job_name: 'locust'
-    static_configs:
-      - targets: ['locust-master:8089']
-    metrics_path: '/export/prometheus'
+    scrape_configs:
+      - job_name: 'locust'
+        static_configs:
+          - targets: ['locust-master:9191']
+        metrics_path: '/' # locust-plugins on separate port serves metrics at root

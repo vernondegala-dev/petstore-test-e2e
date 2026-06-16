@@ -12,6 +12,9 @@ spec:
     - port: 5557
       targetPort: 5557
       name: communication
+    - port: 9191
+      targetPort: 9191
+      name: prometheus
   selector:
     app: locust-master
   type: LoadBalancer
@@ -32,7 +35,7 @@ spec:
     spec:
       containers:
         - name: locust-master
-          image: your-docker-hub-username/petstore-locust:latest # Updated via Jenkins
+          image: YOUR_DOCKERHUB_NAMESPACE/petstore-locust:latest # Updated via Jenkins
           args: 
             - "-f"
             - "locustfile.py"
@@ -46,25 +49,14 @@ spec:
               name: web
             - containerPort: 5557
               name: communication
+            - containerPort: 9191
+              name: prometheus
           readinessProbe:
             httpGet:
               path: /
               port: 8089
             initialDelaySeconds: 5
             periodSeconds: 10
-          livenessProbe:
-            httpGet:
-              path: /
-              port: 8089
-            initialDelaySeconds: 10
-            periodSeconds: 20
-          resources:
-            requests:
-              cpu: "250m"
-              memory: "512Mi"
-            limits:
-              cpu: "500m"
-              memory: "1Gi"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -82,7 +74,7 @@ spec:
     spec:
       containers:
         - name: locust-worker
-          image: your-docker-hub-username/petstore-locust:latest # Updated via Jenkins
+          image: YOUR_DOCKERHUB_NAMESPACE/petstore-locust:latest # Updated via Jenkins
           args: 
             - "-f"
             - "locustfile.py"
@@ -91,10 +83,3 @@ spec:
             - "locust-master"
             - "--host"
             - "https://petstore.swagger.io"
-          resources:
-            requests:
-              cpu: "250m"
-              memory: "512Mi"
-            limits:
-              cpu: "500m"
-              memory: "1Gi"
