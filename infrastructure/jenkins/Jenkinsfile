@@ -47,7 +47,7 @@ pipeline {
                     def pytestImageRun = "${DOCKER_REGISTRY}/petstore-pytest:${env.BUILD_NUMBER}"
 
                     echo "Running containerized tests using image: ${pytestImageRun}"
-                    
+
                     // 1. Pre-create the directory cleanly
                     sh "mkdir -p ${WORKSPACE}/reports"
 
@@ -74,12 +74,15 @@ pipeline {
         stage('Deploy Performance Infrastructure (K8s)') {
             steps {
                 script {
+                    // Reconstruct the exact image tag built in Build #26
+                    def locustImageName = "${DOCKER_REGISTRY}/petstore-locust:${env.BUILD_NUMBER}"
+
                     echo "Applying Kubernetes manifests..."
                     sh "kubectl apply -f infrastructure/k8s/locust.yaml"
-                    
-                    // Update the running deployment with the newly pushed image
-                    sh "kubectl set image deployment/locust-master locust-master=${env.FINAL_LOCUST_IMAGE}"
-                    sh "kubectl set image deployment/locust-worker locust-worker=${env.FINAL_LOCUST_IMAGE}"
+
+                    // Fix: Pass the actual variable name, not an empty or misspelled reference
+                    sh "kubectl set image deployment/locust-master locust-master=${locustImageName}"
+                    sh "kubectl set image deployment/locust-worker locust-worker=${locustImageName}"
                 }
             }
         }
