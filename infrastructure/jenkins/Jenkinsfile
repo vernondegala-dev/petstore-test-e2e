@@ -45,14 +45,26 @@ pipeline {
         stage('API Tests (Pytest)') {
             steps {
                 script {
-                    // Run pytest in a container and capture results
-                    // We pull the image we just pushed to ensure consistency
-                    sh "docker run --rm -v ${WORKSPACE}/reports:/app/reports ${PYTEST_IMAGE}"
+                    // Dynamically construct the image name using your registry parameter and build number
+                    def pytestImageRun = "${DOCKER_REGISTRY}/petstore-pytest:${env.BUILD_NUMBER}"
+
+                    echo "Pulling/Verifying image consistency: ${pytestImageRun}"
+
+                    // Run pytest in a container, mounting the workspace reports folder to capture the HTML output
+                    sh "docker run --rm -v ${WORKSPACE}/reports:/app/reports ${pytestImageRun}"
                 }
             }
             post {
                 always {
-                    publishHTML([allowMissing: false, alwaysLinkToLastBuild: true, keepAll: true, reportDir: 'reports', reportFiles: 'report.html', reportName: 'Pytest API Report', reportTitles: ''])
+                    publishHTML([
+                        allowMissing: false,
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: 'reports',
+                        reportFiles: 'report.html',
+                        reportName: 'Pytest API Report',
+                        reportTitles: 'Petstore API Test Execution'
+                    ])
                 }
             }
         }
