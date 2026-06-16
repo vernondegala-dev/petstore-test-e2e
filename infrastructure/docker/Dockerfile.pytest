@@ -5,7 +5,14 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Ensure ALL project modules are copied into the container context
 COPY . .
 
-# Run pytest by default
-CMD ["pytest", "tests/", "--html=reports/report.html"]
+# 1. Force Python to look at /app root for packages (Fixes 'api_client' module error)
+ENV PYTHONPATH=/app
+
+# 2. Pre-create the directory to guarantee smooth volume mounting permissions
+RUN mkdir -p /app/reports
+
+# Run pytest by default pointing to our designated location
+CMD ["pytest", "tests/", "--html=/app/reports/report.html", "--self-contained-html"]
