@@ -33,7 +33,8 @@ spec:
       containers:
         - name: locust-master
           image: your-docker-repo/petstore-locust:latest
-          args: ["--master"]
+          # 1. Added explicit file loading paths to the master process
+          args: ["-f", "locustfile.py", "--master"]
           ports:
             - containerPort: 8089
             - containerPort: 5557
@@ -55,4 +56,5 @@ spec:
       containers:
         - name: locust-worker
           image: your-docker-repo/petstore-locust:latest
-          args: ["--worker", "--master-host=locust-master"]
+          # 2. Added explicit file loading paths to the worker group
+          args: ["-f", "locustfile.py", "--worker", "--master-host=locust-master"]
