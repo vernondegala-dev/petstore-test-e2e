@@ -6,6 +6,10 @@ pipeline {
         DOCKER_HUB_USER = "your-dockerhub-username"
         PYTEST_IMAGE = "${DOCKER_HUB_USER}/petstore-pytest:${env.BUILD_NUMBER}"
         LOCUST_IMAGE = "${DOCKER_HUB_USER}/petstore-locust:${env.BUILD_NUMBER}"
+        
+        // Forces Docker to use the default context (local Unix socket)
+        // This avoids the "desktop-linux" context resolution error on macOS
+        DOCKER_CONTEXT = 'default'
     }
 
     stages {
@@ -37,6 +41,8 @@ pipeline {
             steps {
                 script {
                     sh "mkdir -p ${WORKSPACE}/reports"
+                    // Running with --net=host or similar might be needed if tests talk to local services, 
+                    // but since we are hitting petstore.swagger.io, default bridge is fine.
                     sh "docker run --rm -v ${WORKSPACE}/reports:/app/reports ${PYTEST_IMAGE}"
                 }
             }
@@ -59,10 +65,9 @@ pipeline {
             steps {
                 script {
                     echo "Applying Kubernetes manifests..."
-                    // We apply the base manifest first
                     sh "kubectl apply -f infrastructure/k8s/locust.yaml"
                     
-                    // Then we use kubectl set image to ensure the new version is deployed
+                    // Force update the images to the ones just pushed
                     sh "kubectl set image deployment/locust-master locust-master=${LOCUST_IMAGE}"
                     sh "kubectl set image deployment/locust-worker locust-worker=${LOCUST_IMAGE}"
                 }
