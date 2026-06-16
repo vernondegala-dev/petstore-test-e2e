@@ -10,4 +10,4 @@ COPY performance/locustfile.py .
 EXPOSE 8089
 
 # Default command for master, can be overridden for worker
-CMD ["locust", "-f", "locustfile.py"]
+CMD ["locust", "-f", "locustfile.py", "--web-host", "0.0.0.0"]
