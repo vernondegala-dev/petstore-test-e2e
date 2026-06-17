@@ -3,23 +3,14 @@ import random
 import uuid
 import logging
 import os
-from prometheus_client import start_http_server, Gauge, Counter, Histogram
+from prometheus_client import start_http_server, Gauge, Counter, Histogram, REGISTRY
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# --- DIAGNOSTICS ---
-try:
-    import locust_plugins
-    logger.info(f"locust_plugins found at: {locust_plugins.__file__}")
-    import pkgutil
-    logger.info(f"locust_plugins submodules: {[m.name for m in pkgutil.iter_modules(locust_plugins.__path__)]}")
-except Exception as e:
-    logger.error(f"Diagnostics failed: {e}")
-# -------------------
-
-# Native Prometheus Metrics (Fallback if locust-plugins fails)
+# Native Prometheus Metrics
+# We use 'locust_' prefix to match standard dashboards
 REQUEST_TIME = Histogram('locust_request_duration_seconds', 'Response time in seconds', ['method', 'name'])
 REQUEST_COUNT = Counter('locust_requests_total', 'Total requests', ['method', 'name', 'status'])
 USER_COUNT = Gauge('locust_users', 'Number of active users')
@@ -27,23 +18,22 @@ USER_COUNT = Gauge('locust_users', 'Number of active users')
 @events.request.add_listener
 def on_request(request_type, name, response_time, response_length, exception, **kwargs):
     status = "failure" if exception else "success"
+    # Increment the counters
     REQUEST_COUNT.labels(method=request_type, name=name, status=status).inc()
+    # Observe the response time (convert ms to seconds)
     REQUEST_TIME.labels(method=request_type, name=name).observe(response_time / 1000.0)
 
 @events.init.add_listener
 def on_locust_init(environment, **kwargs):
-    # Start a native prometheus server on 9191
     if environment.web_ui:
-        logger.info("Starting Native Prometheus Exporter on port 9191...")
-        start_http_server(9191)
-        
-        # Also try to load locust-plugins if possible for richer metrics
         try:
-            from locust_plugins.listeners.prometheus import PrometheusExporter
-            PrometheusExporter(environment, port=9192) # Use a different port to avoid conflict
-            logger.info("locust-plugins PrometheusExporter also started on 9192")
-        except:
-            logger.info("locust-plugins PrometheusExporter not available, using native metrics only.")
+            port = int(os.getenv("METRICS_PORT", 9191))
+            logger.info(f"Starting Native Prometheus Exporter on port {port}...")
+            # This starts the metrics server on port 9191
+            start_http_server(port)
+            logger.info("Prometheus Exporter successfully initialized.")
+        except Exception as e:
+            logger.error(f"Failed to initialize Prometheus Exporter: {e}")
 
 class PetstoreUser(HttpUser):
     wait_time = between(1, 5)

@@ -1,126 +1,57 @@
-# Petstore API Test Automation Framework
+# Petstore API Test Automation & Performance Framework
 
-This project provides a comprehensive test automation and performance testing framework for the Petstore API.
+A comprehensive, production-ready framework for testing the [Petstore API](https://petstore.swagger.io/#/).
 
-## Features
-- **Pytest Framework**: Comprehensive API tests for Pet, Store, and User modules.
-- **Locust Performance Testing**: Scalable performance tests with Prometheus integration.
-- **Infrastructure as Code**: Dockerized components and Kubernetes manifests.
-- **CI/CD**: Jenkins pipeline for automated build, test, and deployment.
+## 🚀 Features
+- **Functional Testing:** Pytest suite covering Pet, Store, and User modules with 100% test isolation.
+- **Performance Testing:** Distributed Locust cluster (1 Master, 3 Workers) simulating high-load scenarios.
+- **Native Observability:** Real-time metrics export to Prometheus using a fail-safe native exporter.
+- **Infrastructure as Code (IaC):** Full Kubernetes manifests for easy deployment and scaling.
+- **CI/CD:** Jenkinsfile for automated building, testing, and deployment to K8s.
+- **Visualization:** Beautiful Grafana dashboards for performance monitoring.
 
-## Project Structure
-- `tests/`: Pytest API test scenarios.
-- `performance/`: Locustfile for performance testing.
+## 📂 Project Structure
+- `tests/`: Pytest functional test scenarios.
+- `api_client/`: Modular API client for Petstore.
+- `performance/`: Locustfile for load testing and metrics export.
 - `infrastructure/`:
-  - `docker/`: Dockerfiles for Pytest and Locust.
-  - `k8s/`: Kubernetes manifests for deployment.
-  - `jenkins/`: Jenkinsfile for CI/CD.
+  - `docker/`: Optimized Dockerfiles (Python 3.11-slim).
+  - `k8s/`: Kubernetes manifests for Locust, Prometheus, and Grafana.
+  - `jenkins/`: Jenkins pipeline definition.
 
-## How to Run Locally
+## 🛠️ Setup & Execution
 
-### Pytest
-1. Install dependencies: `pip install -r requirements.txt`
-2. Run tests: `pytest tests/ --html=report.html`
-
-### Locust
-1. Run Locust: `locust -f performance/locustfile.py --host=https://petstore.swagger.io`
-2. Open `http://localhost:8089` to start the test.
-
-## Monitoring & Visualization (Prometheus & Grafana)
-
-The performance tests export metrics to Prometheus, which are then visualized in Grafana.
-
-### 1. Deploy Monitoring Stack
+### 1. Functional Testing (Pytest)
 ```bash
-# Deploy Prometheus
+pip install -r requirements.txt
+pytest tests/ --html=reports/report.html
+```
+
+### 2. Monitoring & Visualization
+```bash
+# Deploy the stack
+kubectl apply -f infrastructure/k8s/prometheus-config.yaml
 kubectl apply -f infrastructure/k8s/prometheus-deployment.yaml
-
-# Deploy Grafana
 kubectl apply -f infrastructure/k8s/grafana-deployment.yaml
+kubectl apply -f infrastructure/k8s/locust.yaml
 
-# Find your External IPs
+# Find External IPs
 kubectl get svc
 ```
-Look for the `EXTERNAL-IP` column for `locust-master`, `prometheus`, and `grafana`. If you are on a local cluster (like Minikube or Docker Desktop) where `EXTERNAL-IP` stays `<pending>`, use port-forwarding:
-```bash
-kubectl port-forward svc/locust-master 8089:8089
-```
-Then access it at `http://localhost:8089`.
+If on a local cluster (Docker Desktop/Minikube), use port-forwarding:
+`kubectl port-forward svc/locust-master 8089:8089`
 
-### 2. Configure Grafana
-1.  Access Grafana via the LoadBalancer IP on port `3000` (Default login: `admin/admin`).
-2.  **Add Data Source:**
-    *   Name: `Prometheus`
-    *   URL: `http://prometheus:9090`  (DO NOT use localhost; this is the internal K8s service name)
-    *   Access: `Server (default)`
-3.  **Import Dashboard:**
-    *   Go to **Dashboards -> Import**.
-    *   **Recommended IDs:**
-        *   `20462` (Locust Prometheus Modern - **Recommended for latest Grafana**)
-        *   `11985` (Locust Dashboard Classic - Very stable)
-        *   `15109` (Locust Swarm/Plugins)
-    *   Enter one of these IDs and click **Load**.
+### 3. Grafana Configuration
+1.  **Login:** `admin/admin` on port `3000`.
+2.  **Add Data Source:** Prometheus (URL: `http://prometheus:9090`).
+3.  **Import Dashboard:** Use ID **`20462`** or **`11985`**.
 
-## Troubleshooting Visualization (Why no data?)
+## 🔄 CI/CD with Jenkins
+1.  **Credentials:** Add `docker-registry-credentials` (Docker Hub) to Jenkins.
+2.  **Configuration:** Update `DOCKER_HUB_USER_RAW` in the `Jenkinsfile` to your username.
+3.  **Execution:** The pipeline builds images, runs API tests, and updates the K8s deployment.
 
-If your Grafana dashboard is empty, follow this checklist in order:
-
-### 1. Start a Locust Test
-Prometheus only collects data while a test is **running**. 
-1.  Open the Locust UI (External IP of `locust-master` service on port `8089`).
-2.  Enter number of users and spawn rate, then click **Start swarming**.
-3.  Wait 30 seconds for Prometheus to scrape the first data points.
-
-### 2. Verify Prometheus Scrape Targets
-1.  Access the Prometheus UI (External IP on port `9090`).
-2.  Go to **Status -> Targets**.
-3.  Look for the `locust` job.
-    - **State: UP** -> Prometheus is successfully talking to Locust.
-    - **State: DOWN** -> Prometheus cannot reach Locust. Check if `locust-master` service is running on port `9191`.
-### 3. Test the Metrics Endpoint Manually
-Run this command from your terminal to see if Locust is exporting data:
-```bash
-# Get the IP of your locust-master service
-kubectl get svc locust-master
-# Try to curl the metrics on the DEDICATED metrics port (9191)
-kubectl port-forward svc/locust-master 9191:9191
-curl http://localhost:9191/
-```
-You should see a long list of text starting with `# HELP locust_...`. **Note:** The metrics are served at the root (`/`) of port `9191`, NOT at `/export/prometheus` on port `8089`.
-
-## CI/CD with Jenkins
-
-### 4. Verify Grafana Data Source
-In Grafana -> Data Sources -> Prometheus:
-- **URL:** Must be `http://prometheus:9090`.
-- **Save & Test:** Must show "Data source is working".
-
-## CI/CD with Jenkins
-
-The project includes a `Jenkinsfile` located in `infrastructure/jenkins/` to automate the build, test, and deployment process.
-
-### 1. Prerequisites
-- **Jenkins Plugins:** `Pipeline`, `Git`, `Docker Pipeline`, `HTML Publisher`.
-- **System Requirements:** 
-    - `docker` installed on the Jenkins agent.
-    - `kubectl` configured with access to your Kubernetes cluster.
-    - Permission to push images to your Docker registry.
-
-### 2. Pipeline Configuration
-1.  **Create a New Job:** Select "Pipeline" in Jenkins.
-2.  **Pipeline Definition:** Select "Pipeline script from SCM".
-    - **SCM:** Git
-    - **Repository URL:** [Your Repository URL]
-    - **Script Path:** `infrastructure/jenkins/Jenkinsfile`
-3.  **Environment Variables:** Edit the `Jenkinsfile` or set Jenkins environment variables for:
-    - `DOCKER_REGISTRY`: Your private or public registry (e.g., `my-docker-hub-user`).
-
-### 3. Pipeline Stages
-- **Checkout:** Clones the repository.
-- **Build Images:** Builds Docker images for both Pytest (API tests) and Locust (performance).
-- **API Tests (Pytest):** Runs functional tests in a container and publishes an HTML report.
-- **Deploy Performance (K8s):** Updates the Kubernetes manifests with the new image tags and deploys the Locust cluster.
-
-### 4. Viewing Results
-- Functional test reports are available in the **"Pytest API Report"** link on the Jenkins job sidebar.
-- Performance metrics can be viewed in **Grafana** once the deployment stage is complete.
+## 🔍 Troubleshooting
+- **No Data in Grafana?** Ensure you have clicked **"Start Swarming"** in the Locust UI. Metrics are only generated during active tests.
+- **Connection Refused?** Verify that Prometheus is scraping `locust-master:9191/`. You can check this in the Prometheus UI under **Status -> Targets**.
+- **Pytest Failures?** Check the "Pytest API Report" link in Jenkins for a detailed HTML breakdown of every test case.
