@@ -6,10 +6,10 @@ metadata:
 data:
   prometheus.yml: |
     global:
-      scrape_interval: 5s # Faster scraping for real-time Locust metrics
+      scrape_interval: 5s
 
     scrape_configs:
       - job_name: 'locust'
         static_configs:
           - targets: ['locust-master:9191']
-        metrics_path: '/' # locust-plugins on separate port serves metrics at root
+        metrics_path: '/'

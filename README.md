@@ -77,17 +77,18 @@ Prometheus only collects data while a test is **running**.
 3.  Look for the `locust` job.
     - **State: UP** -> Prometheus is successfully talking to Locust.
     - **State: DOWN** -> Prometheus cannot reach Locust. Check if `locust-master` service is running on port `9191`.
-
 ### 3. Test the Metrics Endpoint Manually
 Run this command from your terminal to see if Locust is exporting data:
 ```bash
 # Get the IP of your locust-master service
 kubectl get svc locust-master
-# Try to curl the metrics (you may need to port-forward first)
+# Try to curl the metrics on the DEDICATED metrics port (9191)
 kubectl port-forward svc/locust-master 9191:9191
 curl http://localhost:9191/
 ```
-You should see a long list of text starting with `# HELP locust_...`. If you don't, the metrics exporter in `locustfile.py` is not running.
+You should see a long list of text starting with `# HELP locust_...`. **Note:** The metrics are served at the root (`/`) of port `9191`, NOT at `/export/prometheus` on port `8089`.
+
+## CI/CD with Jenkins
 
 ### 4. Verify Grafana Data Source
 In Grafana -> Data Sources -> Prometheus:
