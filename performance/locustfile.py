@@ -8,26 +8,18 @@ import os
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Try all possible import paths for PrometheusExporter
-PrometheusExporter = None
+# Reverting to the known stable import for locust-plugins 3.2.0
 try:
-    from locust_plugins.listeners.prometheus import PrometheusExporter
-    logger.info("Imported PrometheusExporter from locust_plugins.listeners.prometheus")
-except ImportError:
-    try:
-        from locust_plugins.listeners.prometheus_listener import PrometheusExporter
-        logger.info("Imported PrometheusExporter from locust_plugins.listeners.prometheus_listener")
-    except ImportError:
-        try:
-            from locust_plugins.listeners import PrometheusExporter
-            logger.info("Imported PrometheusExporter from locust_plugins.listeners")
-        except ImportError as e:
-            logger.error(f"CRITICAL: Failed to import PrometheusExporter from any known path: {e}")
+    from locust_plugins.listeners import PrometheusListener as PrometheusExporter
+    logger.info("Imported PrometheusListener from locust_plugins.listeners")
+except ImportError as e:
+    PrometheusExporter = None
+    logger.error(f"CRITICAL: Failed to import PrometheusListener: {e}")
 
 @events.init.add_listener
 def on_locust_init(environment, **kwargs):
     if PrometheusExporter:
-        # Note: environment.web_ui is only present on the master node
+        # In older versions, we check if it's the master or standalone
         if environment.web_ui:
             try:
                 port = int(os.getenv("METRICS_PORT", 9191))
@@ -36,8 +28,6 @@ def on_locust_init(environment, **kwargs):
                 logger.info("Prometheus Exporter successfully initialized.")
             except Exception as e:
                 logger.error(f"Failed to initialize Prometheus Exporter: {e}")
-        else:
-            logger.info("Skipping Prometheus Exporter on worker node")
     else:
         logger.error("PrometheusExporter is not available. Metrics will not be exported.")
 

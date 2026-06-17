@@ -1,8 +1,7 @@
 pytest
 requests
-locust==2.33.0
-locust-plugins==4.5.1
-geventhttpclient
+locust==2.15.1
+locust-plugins==3.2.0
 prometheus-client
 pytest-html
 pytest-xdist
