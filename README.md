@@ -3,20 +3,19 @@
 A comprehensive, production-ready framework for testing the [Petstore API](https://petstore.swagger.io/#/).
 
 ## 🚀 Features
-- **Functional Testing:** Pytest suite covering Pet, Store, and User modules with 100% test isolation.
-- **Performance Testing:** Distributed Locust cluster (1 Master, 3 Workers) simulating high-load scenarios.
-- **Native Observability:** Real-time metrics export to Prometheus using a fail-safe native exporter.
-- **Infrastructure as Code (IaC):** Full Kubernetes manifests for easy deployment and scaling.
-- **CI/CD:** Jenkinsfile for automated building, testing, and deployment to K8s.
-- **Visualization:** Beautiful Grafana dashboards for performance monitoring.
+- **Functional Testing:** Pytest suite covering Pet, Store, and User modules with 100% test isolation using unique data generation.
+- **Performance Testing:** Distributed Locust cluster (1 Master, 3 Workers) optimized for Kubernetes high-load simulation.
+- **Native Observability:** Custom gevent-compatible Prometheus exporter providing real-time cluster-wide metrics.
+- **Infrastructure as Code (IaC):** Full Kubernetes manifests for easy deployment of the entire test and monitoring stack.
+- **CI/CD:** Jenkinsfile for automated building, secure image pushing, functional testing, and K8s rolling deployments.
 
 ## 📂 Project Structure
 - `tests/`: Pytest functional test scenarios.
-- `api_client/`: Modular API client for Petstore.
-- `performance/`: Locustfile for load testing and metrics export.
+- `api_client/`: Modular API client for Petstore API interactions.
+- `performance/`: Locustfile for distributed load testing and metrics aggregation.
 - `infrastructure/`:
-  - `docker/`: Optimized Dockerfiles (Python 3.11-slim).
-  - `k8s/`: Kubernetes manifests for Locust, Prometheus, and Grafana.
+  - `docker/`: Optimized Dockerfiles (Python 3.11-slim + build tools).
+  - `k8s/`: K8s manifests for Locust (Master/Worker), Prometheus, and Grafana.
   - `jenkins/`: Jenkins pipeline definition.
 
 ## 🛠️ Setup & Execution
@@ -27,31 +26,37 @@ pip install -r requirements.txt
 pytest tests/ --html=reports/report.html
 ```
 
-### 2. Monitoring & Visualization
+### 2. Monitoring & Visualization (Full Stack)
 ```bash
-# Deploy the stack
+# Apply configurations and deploy the stack
 kubectl apply -f infrastructure/k8s/prometheus-config.yaml
 kubectl apply -f infrastructure/k8s/prometheus-deployment.yaml
 kubectl apply -f infrastructure/k8s/grafana-deployment.yaml
 kubectl apply -f infrastructure/k8s/locust.yaml
 
-# Find External IPs
+# Find External IPs (or use port-forwarding for local clusters)
 kubectl get svc
 ```
-If on a local cluster (Docker Desktop/Minikube), use port-forwarding:
-`kubectl port-forward svc/locust-master 8089:8089`
+*Note: For local development, port-forward the UI: `kubectl port-forward svc/locust-master 8089:8089`*
 
 ### 3. Grafana Configuration
-1.  **Login:** `admin/admin` on port `3000`.
-2.  **Add Data Source:** Prometheus (URL: `http://prometheus:9090`).
+1.  **URL:** `http://<grafana-ip>:3000` (Default: `admin/admin`).
+2.  **Add Data Source:** Prometheus (Internal K8s URL: `http://prometheus:9090`).
 3.  **Import Dashboard:** Use ID **`20462`** or **`11985`**.
 
+## 📊 Available Prometheus Metrics
+The Master pod aggregates statistics from all workers and exposes them on port `9191`. Use these in Prometheus/Grafana:
+- `locust_users`: Active virtual user count.
+- `locust_requests_total`: Cumulative count of requests (labels: `method`, `name`, `status`).
+- `locust_rps`: Current cluster-wide requests per second.
+- `locust_avg_response_time_ms`: Current cluster-wide average latency.
+
 ## 🔄 CI/CD with Jenkins
-1.  **Credentials:** Add `docker-registry-credentials` (Docker Hub) to Jenkins.
-2.  **Configuration:** Update `DOCKER_HUB_USER_RAW` in the `Jenkinsfile` to your username.
-3.  **Execution:** The pipeline builds images, runs API tests, and updates the K8s deployment.
+1.  **Credentials:** Add `docker-registry-credentials` to Jenkins.
+2.  **User Configuration:** Set `DOCKER_HUB_USER_RAW` in `Jenkinsfile` to your Docker Hub username.
+3.  **Automation:** The pipeline automatically handles build tagging, secure push, API validation, and K8s deployment.
 
 ## 🔍 Troubleshooting
-- **No Data in Grafana?** Ensure you have clicked **"Start Swarming"** in the Locust UI. Metrics are only generated during active tests.
-- **Connection Refused?** Verify that Prometheus is scraping `locust-master:9191/`. You can check this in the Prometheus UI under **Status -> Targets**.
-- **Pytest Failures?** Check the "Pytest API Report" link in Jenkins for a detailed HTML breakdown of every test case.
+- **Missing Metrics in Prometheus?** Ensure you have clicked **"Start Swarming"** in the Locust UI. Metrics are created lazily upon the first request.
+- **Connection Refused?** Confirm Prometheus is scraping `locust-master:9191/`. Verify with `kubectl logs -l app=locust-master`.
+- **Image Pull Errors?** Ensure the `DOCKER_HUB_USER_RAW` in your Jenkinsfile matches the namespace in your `locust.yaml`.
