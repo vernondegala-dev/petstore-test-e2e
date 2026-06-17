@@ -35,9 +35,11 @@ spec:
     spec:
       containers:
         - name: locust-master
-          # NOTE: Ensure this is updated to your actual image in Jenkins
-          image: vernondegala/petstore-locust:latest
-          command: ["locust"]
+          # Using your actual Docker Hub username
+          image: vernondegala/petstore-locust:latest 
+          imagePullPolicy: Always
+          # Using python3 -m locust is more reliable for path resolution
+          command: ["python3", "-m", "locust"]
           args: 
             - "-f"
             - "locustfile.py"
@@ -50,6 +52,9 @@ spec:
             - containerPort: 8089
             - containerPort: 5557
             - containerPort: 9191
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -67,8 +72,9 @@ spec:
     spec:
       containers:
         - name: locust-worker
-          image: vernondegala/petstore-locust:latest
-          command: ["locust"]
+          image: vernondegala/petstore-locust:latest 
+          imagePullPolicy: Always
+          command: ["python3", "-m", "locust"]
           args: 
             - "-f"
             - "locustfile.py"
