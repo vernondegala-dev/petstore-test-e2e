@@ -36,7 +36,7 @@ spec:
       containers:
         - name: locust-master
           # NOTE: Ensure this is updated to your actual image in Jenkins
-          image: DOCKER_HUB_USER/petstore-locust:latest
+          image: your-docker-repo/petstore-locust:latest
           command: ["locust"]
           args: 
             - "-f"
@@ -67,7 +67,7 @@ spec:
     spec:
       containers:
         - name: locust-worker
-          image: DOCKER_HUB_USER/petstore-locust:latest
+          image: your-docker-repo/petstore-locust:latest
           command: ["locust"]
           args: 
             - "-f"
