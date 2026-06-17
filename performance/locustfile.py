@@ -2,6 +2,7 @@ from locust import HttpUser, task, between, events
 import random
 import uuid
 import logging
+import os
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -10,26 +11,29 @@ logger = logging.getLogger(__name__)
 # Attempt to import PrometheusExporter
 try:
     from locust_plugins.listeners.prometheus import PrometheusExporter
-    logger.info("Successfully imported PrometheusExporter from locust_plugins.listeners.prometheus")
+    logger.info("Imported PrometheusExporter from locust_plugins.listeners.prometheus")
 except ImportError:
     try:
         from locust_plugins.listeners import PrometheusExporter
-        logger.info("Successfully imported PrometheusExporter from locust_plugins.listeners")
+        logger.info("Imported PrometheusExporter from locust_plugins.listeners")
     except ImportError as e:
         PrometheusExporter = None
-        logger.error(f"Failed to import PrometheusExporter: {e}")
+        logger.error(f"CRITICAL: Failed to import PrometheusExporter: {e}")
 
 @events.init.add_listener
 def on_locust_init(environment, **kwargs):
     if PrometheusExporter:
-        # Note: environment.web_ui is only present on the master node
-        if environment.web_ui:
-            logger.info("Starting Prometheus Exporter on port 9191")
-            PrometheusExporter(environment, port=9191)
-        else:
-            logger.info("Skipping Prometheus Exporter on worker node")
+        # We start it regardless of web_ui check to ensure it binds
+        # locust-plugins handles the master/worker/standalone logic internally
+        try:
+            port = int(os.getenv("METRICS_PORT", 9191))
+            logger.info(f"Initializing Prometheus Exporter on port {port}...")
+            PrometheusExporter(environment, port=port)
+            logger.info("Prometheus Exporter successfully initialized.")
+        except Exception as e:
+            logger.error(f"Failed to initialize Prometheus Exporter: {e}")
     else:
-        logger.error("PrometheusExporter not available, metrics will not be exported")
+        logger.error("PrometheusExporter is None. Metrics will NOT be exported.")
 
 class PetstoreUser(HttpUser):
     wait_time = between(1, 5)
