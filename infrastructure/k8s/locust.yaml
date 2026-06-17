@@ -35,7 +35,9 @@ spec:
     spec:
       containers:
         - name: locust-master
-          image: YOUR_DOCKERHUB_NAMESPACE/petstore-locust:latest # Updated via Jenkins
+          # NOTE: Ensure this is updated to your actual image in Jenkins
+          image: DOCKER_HUB_USER/petstore-locust:latest
+          command: ["locust"]
           args: 
             - "-f"
             - "locustfile.py"
@@ -46,17 +48,8 @@ spec:
             - "https://petstore.swagger.io"
           ports:
             - containerPort: 8089
-              name: web
             - containerPort: 5557
-              name: communication
             - containerPort: 9191
-              name: prometheus
-          readinessProbe:
-            httpGet:
-              path: /
-              port: 8089
-            initialDelaySeconds: 5
-            periodSeconds: 10
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -74,7 +67,8 @@ spec:
     spec:
       containers:
         - name: locust-worker
-          image: YOUR_DOCKERHUB_NAMESPACE/petstore-locust:latest # Updated via Jenkins
+          image: DOCKER_HUB_USER/petstore-locust:latest
+          command: ["locust"]
           args: 
             - "-f"
             - "locustfile.py"

@@ -37,16 +37,62 @@ kubectl apply -f infrastructure/k8s/prometheus-deployment.yaml
 
 # Deploy Grafana
 kubectl apply -f infrastructure/k8s/grafana-deployment.yaml
+
+# Find your External IPs
+kubectl get svc
 ```
+Look for the `EXTERNAL-IP` column for `locust-master`, `prometheus`, and `grafana`. If you are on a local cluster (like Minikube or Docker Desktop) where `EXTERNAL-IP` stays `<pending>`, use port-forwarding:
+```bash
+kubectl port-forward svc/locust-master 8089:8089
+```
+Then access it at `http://localhost:8089`.
 
 ### 2. Configure Grafana
 1.  Access Grafana via the LoadBalancer IP on port `3000` (Default login: `admin/admin`).
 2.  **Add Data Source:**
     *   Name: `Prometheus`
-    *   URL: `http://prometheus:9090`
+    *   URL: `http://prometheus:9090`  (DO NOT use localhost; this is the internal K8s service name)
+    *   Access: `Server (default)`
 3.  **Import Dashboard:**
     *   Go to **Dashboards -> Import**.
-    *   Use Dashboard ID `12020` (standard Locust dashboard) or upload a custom JSON.
+    *   **Recommended IDs:**
+        *   `20462` (Locust Prometheus Modern - **Recommended for latest Grafana**)
+        *   `11985` (Locust Dashboard Classic - Very stable)
+        *   `15109` (Locust Swarm/Plugins)
+    *   Enter one of these IDs and click **Load**.
+
+## Troubleshooting Visualization (Why no data?)
+
+If your Grafana dashboard is empty, follow this checklist in order:
+
+### 1. Start a Locust Test
+Prometheus only collects data while a test is **running**. 
+1.  Open the Locust UI (External IP of `locust-master` service on port `8089`).
+2.  Enter number of users and spawn rate, then click **Start swarming**.
+3.  Wait 30 seconds for Prometheus to scrape the first data points.
+
+### 2. Verify Prometheus Scrape Targets
+1.  Access the Prometheus UI (External IP on port `9090`).
+2.  Go to **Status -> Targets**.
+3.  Look for the `locust` job.
+    - **State: UP** -> Prometheus is successfully talking to Locust.
+    - **State: DOWN** -> Prometheus cannot reach Locust. Check if `locust-master` service is running on port `9191`.
+
+### 3. Test the Metrics Endpoint Manually
+Run this command from your terminal to see if Locust is exporting data:
+```bash
+# Get the IP of your locust-master service
+kubectl get svc locust-master
+# Try to curl the metrics (you may need to port-forward first)
+kubectl port-forward svc/locust-master 9191:9191
+curl http://localhost:9191/
+```
+You should see a long list of text starting with `# HELP locust_...`. If you don't, the metrics exporter in `locustfile.py` is not running.
+
+### 4. Verify Grafana Data Source
+In Grafana -> Data Sources -> Prometheus:
+- **URL:** Must be `http://prometheus:9090`.
+- **Save & Test:** Must show "Data source is working".
 
 ## CI/CD with Jenkins
 
