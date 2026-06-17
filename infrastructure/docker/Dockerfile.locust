@@ -1,5 +1,11 @@
 FROM python:3.11-slim
 
+# Install build dependencies for locust-plugins and its requirements
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY requirements.txt .
@@ -8,6 +14,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY performance/locustfile.py .
 
 EXPOSE 8089
+EXPOSE 9191
 
-# Default command for master, can be overridden for worker
-CMD ["locust", "-f", "locustfile.py", "--web-host", "0.0.0.0"]
+CMD ["python3", "-m", "locust", "-f", "locustfile.py", "--web-host", "0.0.0.0"]

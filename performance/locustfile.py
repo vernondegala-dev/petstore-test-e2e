@@ -1,6 +1,4 @@
 from locust import HttpUser, task, between, events
-# Direct import - will cause crash with clear logs if install is broken
-from locust_plugins.listeners.prometheus import PrometheusExporter
 import random
 import uuid
 import logging
@@ -10,16 +8,38 @@ import os
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Try all possible import paths for PrometheusExporter
+PrometheusExporter = None
+try:
+    from locust_plugins.listeners.prometheus import PrometheusExporter
+    logger.info("Imported PrometheusExporter from locust_plugins.listeners.prometheus")
+except ImportError:
+    try:
+        from locust_plugins.listeners.prometheus_listener import PrometheusExporter
+        logger.info("Imported PrometheusExporter from locust_plugins.listeners.prometheus_listener")
+    except ImportError:
+        try:
+            from locust_plugins.listeners import PrometheusExporter
+            logger.info("Imported PrometheusExporter from locust_plugins.listeners")
+        except ImportError as e:
+            logger.error(f"CRITICAL: Failed to import PrometheusExporter from any known path: {e}")
+
 @events.init.add_listener
 def on_locust_init(environment, **kwargs):
-    # locust-plugins >= 4.0.0 uses this path and handles master/worker internally
-    try:
-        port = int(os.getenv("METRICS_PORT", 9191))
-        logger.info(f"Starting Prometheus Exporter on port {port}...")
-        PrometheusExporter(environment, port=port)
-        logger.info("Prometheus Exporter successfully initialized.")
-    except Exception as e:
-        logger.error(f"Failed to initialize Prometheus Exporter: {e}")
+    if PrometheusExporter:
+        # Note: environment.web_ui is only present on the master node
+        if environment.web_ui:
+            try:
+                port = int(os.getenv("METRICS_PORT", 9191))
+                logger.info(f"Starting Prometheus Exporter on port {port}...")
+                PrometheusExporter(environment, port=port)
+                logger.info("Prometheus Exporter successfully initialized.")
+            except Exception as e:
+                logger.error(f"Failed to initialize Prometheus Exporter: {e}")
+        else:
+            logger.info("Skipping Prometheus Exporter on worker node")
+    else:
+        logger.error("PrometheusExporter is not available. Metrics will not be exported.")
 
 class PetstoreUser(HttpUser):
     wait_time = between(1, 5)
