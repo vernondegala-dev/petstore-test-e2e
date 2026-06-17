@@ -40,13 +40,16 @@ def on_locust_init(environment, **kwargs):
 @events.request.add_listener
 def on_request(request_type, name, response_time, response_length, exception, **kwargs):
     status = "failure" if exception else "success"
-    # This fires on Master when worker reports, or on standalone
     REQUEST_COUNT.labels(method=request_type, name=name, status=status).inc()
     REQUEST_TIME.labels(method=request_type, name=name).observe(response_time / 1000.0)
 
 class PetstoreUser(HttpUser):
     wait_time = between(1, 5)
-    created_pet_ids = []
+    
+    def on_start(self):
+        """Each user creates their own pet at the start to ensure they have at least one valid ID."""
+        self.my_pet_ids = []
+        self.add_pet()
 
     @task(3)
     def find_pets_by_status(self):
@@ -55,18 +58,36 @@ class PetstoreUser(HttpUser):
     @task(1)
     def add_pet(self):
         pet_id = int(uuid.uuid4().int >> 96)
-        payload = {"id": pet_id, "name": f"LocustPet_{pet_id}", "photoUrls": [], "status": "available"}
+        payload = {
+            "id": pet_id,
+            "name": f"LocustPet_{pet_id}",
+            "photoUrls": ["http://example.com/photo.jpg"],
+            "status": "available"
+        }
         with self.client.post("/v2/pet", json=payload, name="/pet", catch_response=True) as response:
             if response.status_code == 200:
-                self.created_pet_ids.append(pet_id)
+                self.my_pet_ids.append(pet_id)
                 response.success()
             else:
-                response.failure(f"Error {response.status_code}")
+                response.failure(f"Add pet failed with {response.status_code}")
 
     @task(2)
     def get_pet_by_id(self):
-        pet_id = random.choice(self.created_pet_ids) if self.created_pet_ids else 1
-        self.client.get(f"/v2/pet/{pet_id}", name="/pet/{petId}")
+        # Always use a pet ID we know exists (one we created)
+        if self.my_pet_ids:
+            pet_id = random.choice(self.my_pet_ids)
+            # EXPLICIT URL construction to avoid any interpolation issues
+            url = "/v2/pet/" + str(pet_id)
+            logger.info(f"Requesting Pet ID: {pet_id} via URL: {url}")
+            
+            with self.client.get(url, name="/pet/{petId}", catch_response=True) as response:
+                if response.status_code == 200:
+                    response.success()
+                else:
+                    response.failure(f"Get pet {pet_id} failed with {response.status_code}")
+        else:
+            # Fallback if no pets created yet
+            self.add_pet()
 
     @task(1)
     def get_inventory(self):
