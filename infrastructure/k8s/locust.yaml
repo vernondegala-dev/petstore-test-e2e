@@ -35,10 +35,9 @@ spec:
     spec:
       containers:
         - name: locust-master
-          # Using your actual Docker Hub username
-          image: vernondegala/petstore-locust:latest 
+          # REPLACE with your actual Docker Hub username
+          image: YOUR_DOCKERHUB_NAMESPACE/petstore-locust:latest 
           imagePullPolicy: Always
-          # Using python3 -m locust is more reliable for path resolution
           command: ["python3", "-m", "locust"]
           args: 
             - "-f"
@@ -72,7 +71,7 @@ spec:
     spec:
       containers:
         - name: locust-worker
-          image: vernondegala/petstore-locust:latest 
+          image: YOUR_DOCKERHUB_NAMESPACE/petstore-locust:latest 
           imagePullPolicy: Always
           command: ["python3", "-m", "locust"]
           args: 

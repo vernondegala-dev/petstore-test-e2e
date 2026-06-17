@@ -2,11 +2,8 @@ pipeline {
     agent any
 
     environment {
-        // IMPORTANT: Change this to your actual Docker Hub username.
-        // It will be automatically converted to lowercase by the script below.
+        // REPLACE this with your actual Docker Hub username in the Jenkins UI or here
         DOCKER_HUB_USER_RAW = "YOUR_DOCKERHUB_NAMESPACE" 
-        
-        // Forces Docker to use the default context (local Unix socket)
         DOCKER_CONTEXT = 'default'
     }
 
@@ -20,22 +17,31 @@ pipeline {
         stage('Build and Push Images') {
             steps {
                 script {
-                    // Dynamically evaluate your actual account username
-                    def pytestImageName = "${DOCKER_REGISTRY}/petstore-pytest:${env.BUILD_NUMBER}"
-                    def locustImageName = "${DOCKER_REGISTRY}/petstore-locust:${env.BUILD_NUMBER}"
+                    def dockerUser = env.DOCKER_HUB_USER_RAW.toLowerCase()
+                    def pytestImage = "${dockerUser}/petstore-pytest:${env.BUILD_NUMBER}"
+                    def locustImage = "${dockerUser}/petstore-locust:${env.BUILD_NUMBER}"
+                    def pytestLatest = "${dockerUser}/petstore-pytest:latest"
+                    def locustLatest = "${dockerUser}/petstore-locust:latest"
 
                     docker.withRegistry('https://index.docker.io/v1/', 'docker-registry-credentials') {
+                        
+                        echo "Building Pytest image..."
+                        def pytestImg = docker.build("${pytestImage}", "-f infrastructure/docker/Dockerfile.pytest .")
+                        pytestImg.tag("latest")
 
-                        echo "Building Pytest image: ${pytestImageName}"
-                        sh "docker build -t ${pytestImageName} -f infrastructure/docker/Dockerfile.pytest ."
+                        echo "Building Locust image..."
+                        def locustImg = docker.build("${locustImage}", "-f infrastructure/docker/Dockerfile.locust .")
+                        locustImg.tag("latest")
 
-                        echo "Building Locust image: ${locustImageName}"
-                        sh "docker build -t ${locustImageName} -f infrastructure/docker/Dockerfile.locust ."
-
-                        echo "Pushing images to Docker Hub..."
-                        sh "docker push ${pytestImageName}"
-                        sh "docker push ${locustImageName}"
+                        echo "Pushing images (Build Tag & Latest)..."
+                        pytestImg.push()
+                        pytestImg.push("latest")
+                        locustImg.push()
+                        locustImg.push("latest")
                     }
+                    
+                    env.FINAL_PYTEST_IMAGE = pytestImage
+                    env.FINAL_LOCUST_IMAGE = locustImage
                 }
             }
         }
@@ -43,23 +49,14 @@ pipeline {
         stage('API Tests (Pytest)') {
             steps {
                 script {
-                    // Reconstruct the exact image tag built and pushed in the previous stage
-                    def pytestImageRun = "${DOCKER_REGISTRY}/petstore-pytest:${env.BUILD_NUMBER}"
-
-                    echo "Running containerized tests using image: ${pytestImageRun}"
-
-                    // 1. Pre-create the directory cleanly
                     sh "mkdir -p ${WORKSPACE}/reports"
-
-                    // 2. Execute the verified dynamic image name instead of letting it default to null
-                    sh "docker run --rm -v ${WORKSPACE}/reports:/app/reports ${pytestImageRun}"
+                    sh "docker run --rm -v ${WORKSPACE}/reports:/app/reports ${env.FINAL_PYTEST_IMAGE}"
                 }
             }
             post {
                 always {
-                    // Only attempt to archive if the file was successfully written to the workspace
                     publishHTML([
-                        allowMissing: true, // Prevents Jenkins from crashing if a massive compilation failure occurs
+                        allowMissing: false,
                         alwaysLinkToLastBuild: true,
                         keepAll: true,
                         reportDir: 'reports',
@@ -74,16 +71,9 @@ pipeline {
         stage('Deploy Performance Infrastructure (K8s)') {
             steps {
                 script {
-                    // Reconstruct the exact image tag built and pushed earlier in the pipeline
-                    def locustImageName = "${DOCKER_REGISTRY}/petstore-locust:${env.BUILD_NUMBER}"
-
-                    echo "Applying Kubernetes manifests..."
                     sh "kubectl apply -f infrastructure/k8s/locust.yaml"
-
-                    echo "Patching Kubernetes deployments with new image: ${locustImageName}"
-                    // FIX: Use the variable wrapper ${locustImageName} instead of an empty/null reference
-                    sh "kubectl set image deployment/locust-master locust-master=${locustImageName}"
-                    sh "kubectl set image deployment/locust-worker locust-worker=${locustImageName}"
+                    sh "kubectl set image deployment/locust-master locust-master=${env.FINAL_LOCUST_IMAGE}"
+                    sh "kubectl set image deployment/locust-worker locust-worker=${env.FINAL_LOCUST_IMAGE}"
                 }
             }
         }
