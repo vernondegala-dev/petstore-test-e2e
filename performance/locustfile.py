@@ -1,13 +1,13 @@
 from locust import HttpUser, task, between, events
-from locust_plugins.listeners import PrometheusExporter
+from locust_plugins.listeners.prometheus import PrometheusExporter
 import random
 import uuid
 
 # Prometheus Exporter Listener
 @events.init.add_listener
 def on_locust_init(environment, **kwargs):
-    # We use a dedicated port 9191 for Prometheus to avoid conflict with Web UI on 8089
-    # This works on both master and standalone instances
+    # This correctly initializes the Prometheus exporter on port 9191
+    # Note: locust-plugins >= 4.0.0 moved the exporter to this sub-module
     PrometheusExporter(environment, port=9191)
 
 class PetstoreUser(HttpUser):
