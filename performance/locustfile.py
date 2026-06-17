@@ -1,14 +1,23 @@
 from locust import HttpUser, task, between, events
-from locust_plugins.listeners.prometheus import PrometheusExporter
 import random
 import uuid
+
+# Robust import for PrometheusExporter
+try:
+    from locust_plugins.listeners.prometheus import PrometheusExporter
+except (ImportError, ModuleNotFoundError):
+    try:
+        from locust_plugins.listeners import PrometheusExporter
+    except (ImportError, ModuleNotFoundError):
+        PrometheusExporter = None
+        print("Warning: PrometheusExporter could not be imported. Metrics will not be exported.")
 
 # Prometheus Exporter Listener
 @events.init.add_listener
 def on_locust_init(environment, **kwargs):
-    # This correctly initializes the Prometheus exporter on port 9191
-    # Note: locust-plugins >= 4.0.0 moved the exporter to this sub-module
-    PrometheusExporter(environment, port=9191)
+    if PrometheusExporter and environment.web_ui:
+        # Exposes metrics at port 9191
+        PrometheusExporter(environment, port=9191)
 
 class PetstoreUser(HttpUser):
     wait_time = between(1, 5)

@@ -1,7 +1,8 @@
 pytest
 requests
-locust
-locust-plugins
+locust==2.33.0
+locust-plugins==4.5.1
+prometheus-client
 pytest-html
 pytest-xdist
 python-dotenv
